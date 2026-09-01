@@ -1,40 +1,45 @@
+import os
+import time
+import threading
+import requests
 from flask import Flask
-import threading, time, requests, os
 
-app = Flask(__name__)
+# --- ARREGLA EL TOKEN ---
+token_raw = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_TOKEN = token_raw.strip().replace(" ", "")
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+print(f"TOKEN INICIO: {TELEGRAM_TOKEN[:10]}...{TELEGRAM_TOKEN[-5:]} CHAT: {CHAT_ID}")
+print("BOT INICIANDO...")
 
-def enviar_mensaje(texto):
+# --- TU BOT DE TRADING ---
+def send_telegram(text):
     try:
-        if not BOT_TOKEN or not CHAT_ID:
-            print("❌ FALTA TOKEN O CHAT_ID en Environment de Render!", flush=True)
-            return
-        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-        data = {"chat_id": CHAT_ID, "text": texto}
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        data = {"chat_id": CHAT_ID, "text": text}
         r = requests.post(url, data=data, timeout=10)
-        print(f"TELEGRAM -> {r.status_code} {r.text[:200]}", flush=True)
+        print(f"TELEGRAM -> {r.status_code} {r.text[:100]}")
     except Exception as e:
-        print(f"ERROR: {e}", flush=True)
+        print(f"Error telegram: {e}")
 
 def bot_loop():
-    print(f"TOKEN INICIO: {str(BOT_TOKEN)[:15]}... CHAT: {CHAT_ID}", flush=True)
-    print("BOT INICIANDO...", flush=True)
-    enviar_mensaje("✅ BOT INICIADO - Deivid si ves esto YA FUNCIONA!")
-    time.sleep(2)
+    send_telegram("✅ Bot DEIVID conectado y funcionando en Render!")
     while True:
         try:
-            enviar_mensaje("🔥 SEÑAL TEST EUR/USD COMPRA 85% 5MIN")
+            # Aquí va tu lógica de trading, por ahora solo avisa que está vivo
+            # send_telegram("Señal de prueba...")
             time.sleep(60)
         except Exception as e:
-            print(f"Loop error: {e}", flush=True)
+            print(f"Error en loop: {e}")
             time.sleep(10)
 
+# --- SERVIDOR PARA RENDER ---
+app = Flask(__name__)
 @app.route('/')
 def home():
-    return "BOT ACTIVO"
+    return "Bot DEIVID activo!"
 
-if __name__ == "__main__":
-    threading.Thread(target=bot_loop, daemon=True).start()
+if __name__ == '__main__':
+    t = threading.Thread(target=bot_loop, daemon=True)
+    t.start()
     app.run(host='0.0.0.0', port=10000)
