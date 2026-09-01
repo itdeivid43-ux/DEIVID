@@ -1,80 +1,79 @@
-import os, time, threading
+import os, time, threading, pytz
 from datetime import datetime
-import pandas as pd
 import yfinance as yf
-from flask import Flask
-from ta.momentum import RSIIndicator
-import requests
+import ta
 import telebot
-import pytz
+from flask import Flask
 
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
-ECUADOR_TZ = pytz.timezone("America/Guayaquil")
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-PAIRS = ["EUR/USD", "GBP/USD", "USD/JPY", "EUR/JPY", "AUD/USD"]
-YAHOO_SYMBOLS = {"EUR/USD":"EURUSD=X","GBP/USD":"GBPUSD=X","USD/JPY":"JPY=X","EUR/JPY":"EURJPY=X","AUD/USD":"AUDUSD=X"}
-
+bot = telebot.TeleBot(TOKEN) if TOKEN else None
 app = Flask(__name__)
-@app.route("/")
-def home(): return "BOT ACTIVO - HORA REAL", 200
 
-def run_web():
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host='0.0.0.0', port=port)
+PARES = ["EURUSD=X", "GBPUSD=X", "AUDUSD=X", "USDJPY=X", "BTC-USD", "ETH-USD"]
+ultima_senal = {}
 
-def download_candles(pair: str):
+def obtener_rsi(par):
     try:
-        symbol = YAHOO_SYMBOLS.get(pair)
-        data = yf.download(symbol, period="2d", interval="1m", progress=False)
-        if data.empty: return None
-        if isinstance(data.columns, pd.MultiIndex):
-            data.columns = data.columns.get_level_values(0)
-        return data
-    except Exception as e:
-        print(f"Error {pair}: {e}")
-        return None
+        df = yf.download(par, period="1d", interval="5m", progress=False)
+        if len(df) < 20: return None, None
+        close = df['Close']
+        rsi = ta.momentum.RSIIndicator(close, window=14).rsi().iloc[-1]
+        precio = float(close.iloc[-1])
+        return round(rsi,2), precio
+    except:
+        return None, None
 
-def analizar(pair):
-    df = download_candles(pair)
-    if df is None or len(df) < 20: return None
-    df['RSI'] = RSIIndicator(df['Close']).rsi()
-    last_rsi = df['RSI'].iloc[-1]
-    price = df['Close'].iloc[-1]
-    signal = None
-    if last_rsi < 30: signal = "CALL 📈"
-    elif last_rsi > 70: signal = "PUT 📉"
-    if signal:
-        hora_ec = datetime.now(ECUADOR_TZ).strftime("%H:%M:%S")
-        return f"🚨 SEÑAL {signal}\nPar: {pair}\nPrecio: {price:.5f}\nRSI: {last_rsi:.2f}\nHora EC: {hora_ec}"
-    return None
-
-bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN) if TELEGRAM_BOT_TOKEN else None
-
-def send_signal(text):
-    if TELEGRAM_CHAT_ID and TELEGRAM_BOT_TOKEN:
-        try:
-            requests.get(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={text}")
-        except: pass
+def es_buena_senal(rsi):
+    if rsi <= 30: return "COMPRA 🟢", "SOBREVENTA"
+    if rsi >= 70: return "VENTA 🔴", "SOBRECOMPRA"
+    return None, None
 
 def loop_senales():
+    print("Bot 5M iniciado - COMPRA/VENTA")
     while True:
-        for pair in PAIRS:
-            msg = analizar(pair)
-            if msg: send_signal(msg)
-            time.sleep(5)
+        try:
+            for par in PARES:
+                rsi, precio = obtener_rsi(par)
+                if rsi is None: continue
+                tipo, motivo = es_buena_senal(rsi)
+                if not tipo: continue
+                if par in ultima_senal and time.time() - ultima_senal[par] < 600:
+                    continue
+                hora_ec = datetime.now(pytz.timezone("America/Guayaquil")).strftime("%H:%M:%S")
+                nombre = par.replace("=X","").replace("-USD","/USD")
+                mensaje = f"""🚨 SEÑAL 5M - {tipo} 🚨
+Par: {nombre}
+Acción: {tipo}
+Temporalidad: 5M ⏱️
+Precio: {precio}
+RSI (5m): {rsi}
+Motivo: {motivo}
+Hora EC: {hora_ec}
+Expiración: 5 MINUTOS ✅"""
+                if bot and CHAT_ID:
+                    bot.send_message(CHAT_ID, mensaje)
+                    ultima_senal[par] = time.time()
+                    print(f"Señal 5M enviada: {par} {tipo}")
+        except Exception as e:
+            print(f"Error: {e}")
         time.sleep(60)
 
-@bot.message_handler(commands=['start','senales'])
-def handle_start(m):
-    bot.reply_to(m, "BOT ACTIVO ✅\nTe enviaré señales cada minuto.")
+@bot.message_handler(commands=['start'])
+def start(m):
+    bot.reply_to(m, "BOT 5M ACTIVO ✅\nSeñales COMPRA/VENTA\nTemporalidad: 5 minutos")
 
 def run_bot():
-    print("Bot iniciado - HORA REAL")
-    bot.infinity_polling()
+    if bot: bot.infinity_polling()
+
+def run_web():
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT",10000)))
+
+@app.route("/")
+def home(): return "Bot DEIVID 5M"
 
 if __name__ == "__main__":
     threading.Thread(target=loop_senales, daemon=True).start()
-    if bot:
-        threading.Thread(target=run_bot, daemon=True).start()
+    threading.Thread(target=run_bot, daemon=True).start()
     run_web()
