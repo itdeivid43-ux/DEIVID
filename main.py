@@ -56,8 +56,6 @@ def send_telegram(text: str):
 
 def main_loop():
     print("Bot iniciado - HORA REAL")
-    if not TELEGRAM_BOT_TOKEN:
-        print("FALTA TELEGRAM_BOT_TOKEN en Render Environment")
     while True:
         try:
             for pair in PAIRS:
