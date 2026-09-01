@@ -1,17 +1,3 @@
-from flask import Flask
-from threading import Thread
-app = Flask('')
-@app.route('/')
-def home():
-    return "¡Bot de señales 24/7 ACTIVO!"
-def run_web():
-    app.run(host='0.0.0.0', port=8080)
-Thread(target=run_web, daemon=True).start()
-"""World Binary signal bot.
-
-This bot only produces trading signals. It never places or manages trades.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -21,6 +7,28 @@ import os
 import tempfile
 import time
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from threading import Thread
+
+from flask import Flask
+
+# --- Servidor web para que Render no se duerma ---
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "¡Bot de señales 24/7 ACTIVO!"
+
+def run_web():
+    app.run(host='0.0.0.0', port=8080)
+
+Thread(target=run_web, daemon=True).start()
+
+"""
+World Binary signal bot.
+
+This bot only produces trading signals. It never places or manages trades.
+"""
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Final
