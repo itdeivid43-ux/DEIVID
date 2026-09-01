@@ -1,39 +1,46 @@
-import os
-import time
-import threading
+import yfinance as yf
 import requests
+import time
+import os
 from flask import Flask
+import threading
 
-# --- ARREGLA EL TOKEN ---
-token_raw = os.getenv("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_TOKEN = token_raw.strip().replace(" ", "")
-CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+TOKEN = "8962914647:AAHFuFSg14UM4zkdJgVdgiI5n41tr6-5E80"
+CHAT_ID = "6273812557"
 
-print(f"TOKEN INICIO: {TELEGRAM_TOKEN[:10]}...{TELEGRAM_TOKEN[-5:]} CHAT: {CHAT_ID}")
+print(f"TOKEN INICIO: {TOKEN[:10]}...")
+print(f"CHAT_ID: {CHAT_ID}")
 print("BOT INICIANDO...")
 
-# --- TU BOT DE TRADING ---
-def send_telegram(text):
+def send_telegram(mensaje):
     try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        data = {"chat_id": CHAT_ID, "text": text}
+        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+        data = {"chat_id": CHAT_ID, "text": mensaje}
         r = requests.post(url, data=data, timeout=10)
-        print(f"TELEGRAM -> {r.status_code} {r.text[:100]}")
+        print(f"TELEGRAM -> {r.status_code} | {r.text[:100]}")
+        return r
     except Exception as e:
-        print(f"Error telegram: {e}")
+        print(f"ERROR TELEGRAM: {e}")
+
+def analizar():
+    try:
+        btc = yf.Ticker("BTC-USD").history(period="1d", interval="1m")
+        precio = btc['Close'].iloc[-1]
+        return f"BTC: ${precio:.2f} - Bot de prueba funcionando!"
+    except Exception as e:
+        return f"Error: {e}"
 
 def bot_loop():
     send_telegram("✅ Bot DEIVID conectado y funcionando en Render!")
     while True:
         try:
-            # Aquí va tu lógica de trading, por ahora solo avisa que está vivo
-            # send_telegram("Señal de prueba...")
+            msg = analizar()
+            send_telegram(msg)
             time.sleep(60)
         except Exception as e:
-            print(f"Error en loop: {e}")
+            print(f"Error loop: {e}")
             time.sleep(10)
 
-# --- SERVIDOR PARA RENDER ---
 app = Flask(__name__)
 @app.route('/')
 def home():
