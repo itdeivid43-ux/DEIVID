@@ -3,5 +3,4 @@ yfinance
 ta
 pytz
 requests
-pandas
 pyTelegramBotAPI
