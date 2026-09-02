@@ -6,94 +6,69 @@ import pytz
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 app = Flask(__name__)
-
-PARES = ["AUDCAD","AUDCHF","AUDJPY","AUDNZD","AUDUSD","CADCHF","CADJPY","CHFJPY","EURAUD","EURCAD","EURCHF","EURGBP","EURJPY","EURNZD","EURUSD","GBPAUD","GBPCAD","GBPCHF","GBPJPY","GBPNZD","GBPUSD","NZDCAD","NZDCHF","NZDJPY","NZDUSD","USDCAD","USDCHF","USDJPY"]
-
-lateral_count = 0
+PARES = ["EURUSD","GBPUSD","USDJPY","AUDUSD","EURJPY"]
 
 def send_telegram(mensaje):
     try:
-        if not TOKEN or not CHAT_ID:
-            print("ERROR: FALTA TOKEN O CHAT_ID EN RENDER")
-            return
         url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-        data = {"chat_id": CHAT_ID, "text": mensaje, "parse_mode": "Markdown"}
+        data = {"chat_id": CHAT_ID, "text": mensaje}
         r = requests.post(url, data=data, timeout=20)
-        print(f"Telegram -> {r.status_code} {r.text[:100]}")
+        print(f"Telegram -> {r.status_code}")
     except Exception as e:
-        print(f"Error telegram: {e}")
+        print(f"Error tg: {e}")
 
 def analizar(par):
     try:
         symbol = f"{par}=X"
         url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=5m&range=1d"
-        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15).json()
-        closes = r['chart']['result'][0]['indicators']['quote'][0]['close']
+        headers = {"User-Agent": "Mozilla/5.0"}
+        r = requests.get(url, headers=headers, timeout=15)
+        print(f"{par} Yahoo -> {r.status_code}")
+        j = r.json()
+        closes = j['chart']['result'][0]['indicators']['quote'][0]['close']
         closes = [c for c in closes if c is not None]
         if len(closes) < 50:
-            return None, None
+            return f"{par}: pocos datos ({len(closes)})"
+
         precio = closes[-1]
         ema9 = sum(closes[-9:])/9
         ema21 = sum(closes[-21:])/21
-        ema50 = sum(closes[-50:])/50
 
-        if ema9 > ema21 > ema50 and precio > ema9:
-            return "SENAL", f"🟢 *{par} COMPRA* - Tendencia Alcista"
-        elif ema9 < ema21 < ema50 and precio < ema9:
-            return "SENAL", f"🔴 *{par} VENTA* - Tendencia Bajista"
+        if ema9 > ema21:
+            return f"🟢 {par} COMPRA - Precio {precio:.5f} > EMA"
+        elif ema9 < ema21:
+            return f"🔴 {par} VENTA - Precio {precio:.5f} < EMA"
         else:
-            return "LATERAL", par
+            return f"{par} LATERAL"
     except Exception as e:
         print(f"Error {par}: {e}")
-        return None, None
+        return f"{par} ERROR: {e}"
 
 def bot_loop():
-    global lateral_count
     time.sleep(5)
-    send_telegram(f"✅ *BOT DEIVID V7 PRENDIDO* ✅\n\nEstoy LIVE en Render\nHora EC: {datetime.now(pytz.timezone('America/Guayaquil')).strftime('%H:%M')}\n\nBuscando señales cada 2 min...")
+    tz = pytz.timezone('America/Guayaquil')
+    hora = datetime.now(tz).strftime('%H:%M')
+    send_telegram(f"🔧 BOT DEBUG PRENDIDO {hora} EC\nProbando 5 pares principales...\nSi ves esto, Telegram SI funciona.")
 
     while True:
         try:
-            tz_ec = pytz.timezone('America/Guayaquil')
-            hora_ec = datetime.now(tz_ec)
-            hora_str = hora_ec.strftime("%H:%M")
-            print(f"--- Analizando {hora_str} EC ---")
+            hora = datetime.now(tz).strftime('%H:%M')
+            print(f"=== SCAN {hora} ===")
+            reporte = f"📊 REPORTE {hora} EC\n\n"
+            for par in PARES:
+                res = analizar(par)
+                reporte += res + "\n"
+                time.sleep(1)
 
-            if 5 <= hora_ec.hour <= 23:
-                senales = 0
-                laterales = []
-                for par in PARES:
-                    tipo, msg = analizar(par)
-                    if tipo == "SENAL":
-                        send_telegram(f"🔥 *SEÑAL {hora_str} EC*\n\n{msg}\n\n⏰ Entrar siguiente vela 5m")
-                        senales += 1
-                        time.sleep(3)
-                        if senales >= 2:
-                            break
-                    elif tipo == "LATERAL":
-                        laterales.append(par)
-
-                if senales == 0:
-                    lateral_count += 1
-                    print(f"Sin señales. Laterales: {len(laterales)} - Contador: {lateral_count}")
-                    if lateral_count >= 5:
-                        send_telegram(f"📊 *MERCADO LATERAL {hora_str} EC*\n\n{len(laterales)}/28 pares sin dirección. Esperando tendencia...")
-                        lateral_count = 0
-                else:
-                    lateral_count = 0
-            else:
-                print("Fuera de horario")
-
-            time.sleep(120)
+            send_telegram(reporte)
+            time.sleep(180) # cada 3 min
         except Exception as e:
-            print(f"Error loop: {e}")
+            print(f"Loop error: {e}")
             time.sleep(60)
 
 @app.route('/')
-def home():
-    return "Bot Activo - Deivid V7 - LIVE"
+def home(): return "Deivid DEBUG Live"
 
 threading.Thread(target=bot_loop, daemon=True).start()
-
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
