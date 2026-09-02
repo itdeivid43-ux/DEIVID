@@ -1,6 +1,5 @@
 Flask
 yfinance
-ta
-pytz
+pandas
 requests
-pyTelegramBotAPI
+pytz
