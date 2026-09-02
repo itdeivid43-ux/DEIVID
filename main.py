@@ -1,19 +1,43 @@
-            # PARA BINARIAS 5m
-            hora_ec = datetime.now(pytz.timezone('America/Guayaquil')).strftime("%H:%M:%S")
-            accion_binaria = "CALL 📈" if buy_ok else "PUT 📉"
-            direccion = "COMPRAR 🟢" if buy_ok else "VENDER 🔴"
-            
-            mensaje = f"""🔥 BINARIAS 85%+ PREMIUM {hora_ec} EC
+import os, requests, time, threading
+from flask import Flask
+import yfinance as yf
+from datetime import datetime
+import pytz
 
-{direccion} {par} {INTERVAL}
-Señal: {accion_binaria}
-💰 Precio: {precio:.5f}
-📊 Estoc 13,3,3 K:{k:.1f} D:{d:.1f}
-📈 RSI {rsi:.1f}
-🎯 Confianza {conf}%
+app = Flask(__name__)
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-⏰ ENTRADA: Siguiente vela 5m
-⏳ EXPIRACIÓN: 5 minutos
-🛡️ Martingala: 1 nivel max
+def send(m):
+    try:
+        requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage", params={"chat_id": CHAT_ID, "text": m}, timeout=10)
+    except: pass
 
-✅ ENTRAR AHORA"""
+def bot():
+    pares = ["EURUSD=X","GBPUSD=X","USDJPY=X","AUDUSD=X","EURJPY=X"]
+    while True:
+        for par in pares:
+            try:
+                df = yf.download(par, period="2d", interval="5m", progress=False)
+                if len(df) < 30: continue
+                c = df['Close']; l = df['Low']; h = df['High']
+                low_min = l.rolling(13).min()
+                high_max = h.rolling(13).max()
+                k = ((c - low_min) / (high_max - low_min) * 100).rolling(3).mean()
+                d = k.rolling(3).mean()
+                ck = float(k.iloc[-1]); pk = float(k.iloc[-2]); cd = float(d.iloc[-1])
+                buy = pk < 20 and ck > 20 and ck > cd
+                sell = pk > 80 and ck < 80 and ck < cd
+                if buy or sell:
+                    hora = datetime.now(pytz.timezone('America/Guayaquil')).strftime("%H:%M:%S")
+                    tipo = "CALL COMPRAR" if buy else "PUT VENDER"
+                    send(f"BOT BINARIAS 5m {hora} EC {tipo} {par} Estoc 13,3,3 K:{ck:.1f} D:{cd:.1f} ENTRAR AHORA sig vela EXP 5m")
+            except: pass
+        time.sleep(60)
+
+threading.Thread(target=bot, daemon=True).start()
+
+@app.route("/")
+def home(): return "Bot V20 Binarias 5m 13,3,3 Activo"
+
+if __name__ == "__main__": app.run(host="0.0.0.0", port=10000)
