@@ -5,19 +5,21 @@ import pytz
 
 app = Flask(__name__)
 @app.route('/')
-def home(): return "BOT BINARIAS 28 PARES 13,3,3 LIVE"
+def home():
+    return "BOT BINARIAS 28 PARES 13,3,3 LIVE"
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 API_KEY = os.getenv("TWELVEDATA_API_KEY")
 EC = pytz.timezone("America/Guayaquil")
 
-PARES = ["EUR/USD","GBP/USD","USD/JPY","AUD/USD","EUR/JPY","GBP/JPY","USD/CHF","EUR/GBP","USD/CAD","NZD/USD","EUR/AUD","GBP/CAD","AUD/CAD","AUD/CHF","AUD/JPY","AUD/NZD","CAD/CHF","CAD/JPY","CHF/JPY","EUR/CAD","EUR/CHF","EURNZD","GBPAUD","GBPCHF","GBPNZD","NZDCAD","NZDCHF","NZDJPY"]
+PARES = ["EUR/USD","GBP/USD","USD/JPY","AUD/USD","EUR/JPY","GBP/JPY","USD/CHF","EUR/GBP","USD/CAD","NZD/USD","EUR/AUD","GBP/CAD","AUD/CAD","AUD/CHF","AUD/JPY","AUD/NZD","CAD/CHF","CAD/JPY","CHF/JPY","EUR/CAD","EUR/CHF","EUR/NZD","GBP/AUD","GBP/CHF","GBP/NZD","NZD/CAD","NZD/CHF","NZD/JPY"]
 
 def send(t):
     try:
         requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", data={"chat_id": CHAT_ID, "text": t}, timeout=15)
-    except: pass
+    except:
+        pass
 
 def get_stoch(par):
     try:
@@ -30,22 +32,25 @@ def get_stoch(par):
         return None, None
 
 def bot_loop():
-    send("✅ BOT 28 PARES 13,3,3 CONECTADO\nFiltro 35/65 listo")
+    send("✅ BOT 28 PARES 13,3,3 CONECTADO")
     while True:
         try:
             ahora = datetime.now(EC)
             hora = ahora.strftime("%H:%M")
-            if 6 <= ahora.hour <= 22:
-                for par in PARES:
-                    k, d = get_stoch(par)
-                    if k is None: continue
-                    if k < 35 and d < 40 and k > d and (k - d) > 0.8:
-                        send(f"🟢 COMPRA 5M {par}\n⏰ {hora} EC\n📊 Stoch 13,3,3 {k:.1f}/{d:.1f}\n✅ Cruce fuerte")
-                    elif k > 65 and d > 60 and k < d and (d - k) > 0.8:
-                        send(f"🔴 VENTA 5M {par}\n⏰ {hora} EC\n📊 Stoch 13,3,3 {k:.1f}/{d:.1f}\n✅ Cruce fuerte")
-                    time.sleep(8)
+            for par in PARES:
+                k, d = get_stoch(par)
+                if k is None:
+                    continue
+                if k < 35 and d < 40 and k > d:
+                    send(f"🟢 COMPRA 5M {par} {hora} EC Stoch {k:.1f}/{d:.1f}")
+                elif k > 65 and d > 60 and k < d:
+                    send(f"🔴 VENTA 5M {par} {hora} EC Stoch {k:.1f}/{d:.1f}")
+                time.sleep(6)
             time.sleep(300)
         except:
             time.sleep(10)
 
 threading.Thread(target=bot_loop, daemon=True).start()
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
