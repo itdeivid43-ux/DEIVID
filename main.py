@@ -1,66 +1,74 @@
-import os, requests, time, threading
-from datetime import datetime
+import os
+import time
+import threading
+import yfinance as yf
+import pandas as pd
 from flask import Flask
-import pytz
 
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-API_KEY = os.getenv("TWELVEDATA_API_KEY")
-EC = pytz.timezone("America/Guayaquil")
-URL = "https://deivid.onrender.com"
-
-PARES_8 = ["XAU/USD", "EUR/USD", "GBP/USD", "USD/JPY", "AUD/USD", "EUR/JPY", "GBP/JPY", "USD/CAD"]
+import requests
 
 app = Flask(__name__)
 
-def send(text):
+# TUS PARES
+PARES = ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X"]
+NOMBRES = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD"]
+
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+
+def send_telegram(msg):
     try:
-        requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", data={"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"}, timeout=10)
-    except:
-        pass
+        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+        requests.post(url, data={"chat_id": CHAT_ID, "text": msg, "parse_mode": "Markdown"})
+    except Exception as e:
+        print(e)
 
-def get_rsi(par):
-    try:
-        url = f"https://api.twelvedata.com/rsi?symbol={par}&interval=5min&apikey={API_KEY}"
-        return float(requests.get(url, timeout=10).json()['values'][0]['rsi'])
-    except:
-        return None
+def stochastic(df, k=13, d=3, smooth=3):
+    low_min = df['Low'].rolling(k).min()
+    high_max = df['High'].rolling(k).max()
+    df['%K'] = 100 * (df['Close'] - low_min) / (high_max - low_min)
+    df['%K'] = df['%K'].rolling(smooth).mean()
+    df['%D'] = df['%K'].rolling(d).mean()
+    return df
 
-# BOT QUE NO SE CAE
-def keep_alive():
-    while True:
+def analizar():
+    mensaje = "📊 *SEÑALES ESTOCÁSTICO 13,3,3 - CADA 10 MIN*\n\n"
+    hay_senal = False
+    
+    for par, nombre in zip(PARES, NOMBRES):
         try:
-            requests.get(URL, timeout=10)
-            print(f"Keep alive ping {datetime.now(EC).strftime('%H:%M:%S')}")
-        except:
-            pass
-        time.sleep(240) # se auto-pingea cada 4 min
-
-def bot():
-    send("✅ BOT 8 PARES INICIADO - ANTI-CAIDA ACTIVADO")
-    while True:
-        try:
-            for par in PARES_8:
-                rsi = get_rsi(par)
-                if rsi is None:
-                    time.sleep(3)
-                    continue
-                print(f"{par} RSI {rsi}")
-                if rsi <= 30:
-                    send(f"🟢 *{par} COMPRA UP* ⬆️ 5 MIN | RSI {round(rsi,1)}")
-                elif rsi >= 70:
-                    send(f"🔴 *{par} VENTA DOWN* ⬇️ 5 MIN | RSI {round(rsi,1)}")
-                time.sleep(5)
-            time.sleep(300)
+            data = yf.download(par, period="2d", interval="5m", progress=False)
+            if len(data) < 30: continue
+            data = stochastic(data)
+            k_actual = float(data['%K'].iloc[-1])
+            k_anterior = float(data['%K'].iloc[-2])
+            
+            senal = ""
+            if k_anterior < 20 and k_actual > 20:
+                senal = f"🟢 *COMPRA {nombre} - UP 5 MIN* (Estoc {k_actual:.1f} subiendo 20)"
+                hay_senal = True
+            elif k_anterior > 80 and k_actual < 80:
+                senal = f"🔴 *VENTA {nombre} - DOWN 5 MIN* (Estoc {k_actual:.1f} bajando 80)"
+                hay_senal = True
+            else:
+                senal = f"⚪ {nombre} - Esperar (Estoc {k_actual:.1f})"
+            
+            mensaje += senal + "\n"
         except Exception as e:
-            print(f"Error bot, reiniciando: {e}")
-            time.sleep(30)
+            print(f"Error {nombre}: {e}")
+
+    # Te lo manda CADA 10 minutos aunque no haya compra/venta para que sepas que está vivo
+    send_telegram(mensaje)
+
+def loop_bot():
+    while True:
+        analizar()
+        time.sleep(600) # 600 segundos = 10 minutos
 
 @app.route('/')
 def home():
-    return "Bot Deivid 8 Pares Binarias ONLINE - ANTI CAIDA", 200
+    return "Bot Estocástico 13,3,3 activo cada 10 min"
 
-if __name__ == "__main__":
-    threading.Thread(target=keep_alive, daemon=True).start()
-    threading.Thread(target=bot, daemon=True).start()
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+if __name__ == '__main__':
+    threading.Thread(target=loop_bot, daemon=True).start()
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
