@@ -6,7 +6,7 @@ import pytz
 app = Flask(__name__)
 @app.route('/')
 def home():
-    return "BOT BINARIAS 28 PARES 13,3,3 LIVE"
+    return "BOT 28 PARES MEDIO LIVE"
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
@@ -32,7 +32,7 @@ def get_stoch(par):
         return None, None
 
 def bot_loop():
-    send("✅ BOT 28 PARES 13,3,3 CONECTADO")
+    send("✅ BOT 28 PARES MODO MEDIO CONECTADO - Señal cada 10-15 min")
     while True:
         try:
             ahora = datetime.now(EC)
@@ -41,12 +41,12 @@ def bot_loop():
                 k, d = get_stoch(par)
                 if k is None:
                     continue
-                if k < 35 and d < 40 and k > d:
+                if k < 40 and d < 45 and k > d:
                     send(f"🟢 COMPRA 5M {par} {hora} EC Stoch {k:.1f}/{d:.1f}")
-                elif k > 65 and d > 60 and k < d:
+                elif k > 60 and d > 55 and k < d:
                     send(f"🔴 VENTA 5M {par} {hora} EC Stoch {k:.1f}/{d:.1f}")
                 time.sleep(6)
-            time.sleep(300)
+            time.sleep(120)
         except:
             time.sleep(10)
 
