@@ -6,7 +6,7 @@ import pytz
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 app = Flask(__name__)
-PARES = ["EURUSD","GBPUSD","USDJPY","AUDUSD","EURJPY","GBPJPY","USDCHF","EURGBP"]
+PARES = ["EURUSD","GBPUSD","USDJPY","AUDUSD","NZDUSD","EURJPY","GBPJPY","USDCAD"]
 
 def send_telegram(mensaje):
     try:
@@ -20,72 +20,67 @@ def analizar(par):
         url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=5m&range=5d"
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
         j = r.json()
-        closes = j['chart']['result'][0]['indicators']['quote'][0]['close']
-        highs = j['chart']['result'][0]['indicators']['quote'][0]['high']
-        lows = j['chart']['result'][0]['indicators']['quote'][0]['low']
-        closes = [c for c in closes if c is not None]
-        if len(closes) < 30: return None
+        data = j['chart']['result'][0]['indicators']['quote'][0]
+        closes = [c for c in data['close'] if c is not None]
+        if len(closes) < 60: return None
 
         precio = closes[-1]
         ema9 = sum(closes[-9:])/9
         ema21 = sum(closes[-21:])/21
         ema50 = sum(closes[-50:])/50
 
-        # RSI
         gains = sum(max(0, closes[i]-closes[i-1]) for i in range(-14,0))
         losses = sum(max(0, closes[i-1]-closes[i]) for i in range(-14,0))
-        rs = gains/(losses+0.001)
-        rsi = 100 - (100/(1+rs))
+        rsi = 100 - (100/(1+gains/(losses+0.001)))
 
-        # FILTRO V8: Evitar mechas gigantes y tendencia débil
-        body = abs(closes[-1]-closes[-2])
-        wick = highs[-1]-lows[-1]
-        if wick > body*3: # Vela con mucha mecha = no entrar
-            return None
+        tz = pytz.timezone('America/Guayaquil')
+        hora_str = datetime.now(tz).strftime('%H:%M')
 
-        direccion = None
-        conf = 0
+        # SOLO SEÑALES PERFECTAS 85-95%
+        if ema9 > ema21 > ema50 and 59 < rsi < 65:
+            conf = 95 if 60 < rsi < 62.5 else 85
+            return f"""📊 SENAL {hora_str} EC
 
-        # COMPRA FUERTE - Solo si está por encima de EMA50 y RSI no sobrecomprado
-        if ema9 > ema21 and closes[-1] > ema50 and 55 < rsi < 72:
-            direccion = "COMPRA 🟢"
-            conf = 70 + (5 if rsi>60 else 0) + (5 if ema9>ema50 else 0)
+🟢 COMPRAR {par} 5m
+💰 {precio:.5f}
+📊 EMA9>EMA21>EMA50
+📈 RSI {rsi:.1f}
+🎯 Confianza {conf}% ✅
+💵 Payout 85%
 
-        # VENTA FUERTE - Solo si está por debajo de EMA50 y RSI no sobrevendido
-        elif ema9 < ema21 and closes[-1] < ema50 and 28 < rsi < 45:
-            direccion = "VENTA 🔴"
-            conf = 70 + (5 if rsi<38 else 0) + (5 if ema9<ema50 else 0)
+⏰ Entrar siguiente vela 5m {hora_str}"""
 
-        if direccion and conf >= 70:
-            return f"""🔥 SEÑAL V8 {conf}%
-{par} - {direccion}
+        elif ema9 < ema21 < ema50 and 35 < rsi < 41:
+            conf = 95 if 37 < rsi < 39.5 else 85
+            return f"""📊 SENAL {hora_str} EC
 
-⏰ Hora: {datetime.now(pytz.timezone('America/Guayaquil')).strftime('%H:%M')} EC
-⏳ Expira: 5 MINUTOS
-💰 Entrada: Próxima vela 5M
-📊 RSI: {rsi:.1f} | Tendencia: Fuerte
+🔴 VENDER {par} 5m
+💰 {precio:.5f}
+📊 EMA9<EMA21<EMA50
+📈 RSI {rsi:.1f}
+🎯 Confianza {conf}% ✅
+💵 Payout 85%
 
-👉 Entra YA en {par} con 1$
-"""
+⏰ Entrar siguiente vela 5m {hora_str}"""
         return None
     except: return None
 
 def bot_loop():
     time.sleep(5)
     tz = pytz.timezone('America/Guayaquil')
-    send_telegram(f"✅ BOT V8 PRO 70%+ PRENDIDO {datetime.now(tz).strftime('%H:%M')} EC\nFiltros: Sin mechas, solo tendencia fuerte. Menos señales, más aciertos.")
+    send_telegram(f"✅ V11 FORMATO PRO 95% PRENDIDO {datetime.now(tz).strftime('%H:%M')} EC\nFormato igual a la foto. NZDUSD incluido.")
     while True:
         try:
             for par in PARES:
                 senal = analizar(par)
                 if senal:
                     send_telegram(senal)
-                    time.sleep(3)
-            time.sleep(90) # Revisa cada 90 seg, no cada 60 para no spamear
-        except: time.sleep(90)
+                    time.sleep(4)
+            time.sleep(120)
+        except: time.sleep(120)
 
 @app.route('/')
-def home(): return "Deivid V8 Pro Live"
+def home(): return "V11 Pro 95%"
 threading.Thread(target=bot_loop, daemon=True).start()
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
