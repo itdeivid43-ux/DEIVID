@@ -10,8 +10,18 @@ CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 def send(m):
     try:
-        requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage", params={"chat_id": CHAT_ID, "text": m}, timeout=10)
-    except: pass
+        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+        r = requests.get(url, params={"chat_id": CHAT_ID, "text": m}, timeout=10)
+        print(f"Telegram status: {r.status_code} {r.text}")
+        return r.text
+    except Exception as e:
+        print(f"Error telegram: {e}")
+        return str(e)
+
+@app.route("/test")
+def test():
+    result = send("✅ PRUEBA BOT BINARIAS - Si ves esto en Telegram, TODO esta bien conectado")
+    return f"Enviado: {result}"
 
 def bot():
     pares = ["EURUSD=X","GBPUSD=X","USDJPY=X","AUDUSD=X","EURJPY=X"]
@@ -32,12 +42,15 @@ def bot():
                     hora = datetime.now(pytz.timezone('America/Guayaquil')).strftime("%H:%M:%S")
                     tipo = "CALL COMPRAR" if buy else "PUT VENDER"
                     send(f"BOT BINARIAS 5m {hora} EC {tipo} {par} Estoc 13,3,3 K:{ck:.1f} D:{cd:.1f} ENTRAR AHORA sig vela EXP 5m")
-            except: pass
+            except Exception as e:
+                print(e)
         time.sleep(60)
 
 threading.Thread(target=bot, daemon=True).start()
 
 @app.route("/")
-def home(): return "Bot V20 Binarias 5m 13,3,3 Activo"
+def home():
+    return "Bot V20 Binarias 5m 13,3,3 Activo - usa /test para probar Telegram"
 
-if __name__ == "__main__": app.run(host="0.0.0.0", port=10000)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=10000)
