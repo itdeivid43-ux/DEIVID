@@ -25,37 +25,35 @@ def evaluar(par):
         rsi = 100 - (100/(1+gains/(losses+0.001)))
         dist = abs(ema9-ema21)/precio*1000
 
-        # FILTRO 85% REAL
-        conf = 0
-        if ema9 > ema21 and 50 < rsi < 68 and dist > 0.05: conf = 87
-        elif ema9 < ema21 and 32 < rsi < 50 and dist > 0.05: conf = 87
-        elif 45 < rsi < 55 and dist > 0.03: conf = 75
-        else: conf = 60
+        if ema9 > ema21 and 52 < rsi < 67 and dist > 0.06: conf = 87
+        elif ema9 < ema21 and 33 < rsi < 48 and dist > 0.06: conf = 87
+        elif 48 < rsi < 68 and dist > 0.04 or 32 < rsi < 52 and dist > 0.04: conf = 72
+        else: conf = 55
 
         direccion = "COMPRAR 🟢" if ema9>ema21 else "VENDER 🔴"
-        return (conf, par, precio, direccion, rsi, dist)
+        if conf >= 85: tag = "🔥 85%+ PREMIUM"
+        elif conf >= 70: tag = "✅ 70% BUENA"
+        else: return None
+
+        return (conf, f"{tag} {datetime.now(pytz.timezone('America/Guayaquil')).strftime('%H:%M')} EC\n\n{direccion} {par} 5m\n💰 {precio:.5f}\n📈 RSI {rsi:.1f}\n🎯 Confianza {conf}%\n\n⏰ Entrada siguiente vela")
     except: return None
 
 def bot_loop():
     time.sleep(5)
     tz = pytz.timezone('America/Guayaquil')
-    send_telegram(f"✅ V11.6 PRECISION 85% PRENDIDO {datetime.now(tz).strftime('%H:%M')} EC\nAnalizo 5 activos cada 5 min y solo mando si hay 85%+")
+    send_telegram(f"✅ V11.8 70% y 85% PRENDIDO {datetime.now(tz).strftime('%H:%M')} EC\nCada 5 min analizo 5 activos\n70% = entrada normal\n85% = entrada premium")
     while True:
         try:
-            resultados = [evaluar(p) for p in PARES]
-            resultados = [r for r in resultados if r]
-            if not resultados:
-                time.sleep(300); continue
-            mejor = max(resultados, key=lambda x: x[0])
-            conf, par, precio, direccion, rsi, dist = mejor
-            if conf >= 85:
-                hora = datetime.now(tz).strftime('%H:%M')
-                send_telegram(f"📊 SEÑAL PRECISA {hora} EC\n\n{direccion} {par} 5m\n💰 {precio:.5f}\n📊 EMA9/21 Dist {dist:.3f}\n📈 RSI {rsi:.1f}\n🎯 Confianza {conf}% ✅\n💵 Payout 85%\n\n⏰ Entrada siguiente vela 5m\nSolo mando 85%+")
+            res = [evaluar(p) for p in PARES]
+            res = [r for r in res if r]
+            if res:
+                mejor = max(res, key=lambda x: x[0])
+                send_telegram(mejor[1])
             time.sleep(300)
         except: time.sleep(300)
 
 @app.route('/')
-def home(): return "Precision 85 activo"
+def home(): return "70 y 85"
 threading.Thread(target=bot_loop, daemon=True).start()
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
