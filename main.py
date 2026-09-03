@@ -1,33 +1,38 @@
-import time, threading, requests
+import os
+import threading
+import time
+import requests
 from flask import Flask
 
-BOT_TOKEN = "8962914647:AAG5pHw1oF-HHIDKNRYD_U4dWxYFbC-WYVk"
+BOT_TOKEN = "PEGA_AQUI_TU_TOKEN_NUEVO"  # <--- TU TOKEN NUEVO
 CHAT_ID = "5890249548"
+
+app = Flask(__name__)
 
 def send(msg):
     try:
-        r = requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", data={"chat_id": CHAT_ID, "text": msg}, timeout=15)
-        print(f"Telegram: {r.text}")
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        requests.post(url, data={"chat_id": CHAT_ID, "text": msg}, timeout=10)
     except Exception as e:
-        print(e)
+        print(f"Error send: {e}")
 
-def bot_loop():
-    send("✅ DEIVID BOT CONECTADO - Ya funciona!")
-    offset = 0
+def trading_loop():
+    time.sleep(5)
+    send("✅ DEIVID BOT CONECTADO - Ya estoy LIVE 24/7")
     while True:
         try:
-            resp = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates?offset={offset}&timeout=10", timeout=15).json()
-            for upd in resp.get("result", []):
-                offset = upd["update_id"]+1
-                txt = upd.get("message",{}).get("text","").lower()
-                if "start" in txt or "hola" in txt:
-                    send("🚀 Hola Deivid! Bot activo.")
-            time.sleep(2)
+            # Aqui va tu logica de trading, por ahora solo vive
+            time.sleep(60)
         except:
-            time.sleep(5)
+            time.sleep(10)
 
-threading.Thread(target=bot_loop, daemon=True).start()
-app = Flask(__name__)
+# Inicia el bot en segundo plano
+threading.Thread(target=trading_loop, daemon=True).start()
+
 @app.route('/')
-def home(): return "LIVE"
-app.run(host="0.0.0.0", port=10000)
+def home():
+    return "DEIVID BOT LIVE"
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
