@@ -1,4 +1,4 @@
 Flask
 requests
-pytz
-gunicorn
+yfinance
+pandas
