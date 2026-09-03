@@ -1,45 +1,38 @@
+import os, time, threading, requests
 from flask import Flask
-import threading, time, requests, random, os
 from datetime import datetime
-
+import pytz
 app = Flask(__name__)
-
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
-PARES = ["USDJPY","EURUSD","AUDUSD","GBPUSD","USDCAD","USDCHF","NZDUSD"]
-
-def send(text):
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
+TD_API_KEY = os.getenv("TD_API_KEY")
+SYMBOL = "BTC/USD"
+INTERVAL = "5min"
+ultima_senal = ""
+def hora_ec():
+    return datetime.now(pytz.timezone("America/Guayaquil")).strftime("%H:%M:%S")
+def send(msg):
+    requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", data={"chat_id": CHAT_ID, "text": msg, "parse_mode": "Markdown"})
+def get_emas():
     try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        requests.post(url, json={"chat_id": CHAT_ID, "text": text, "parse_mode": "HTML"}, timeout=10)
-    except: pass
-
-def bot_loop():
-    time.sleep(10)
-    send("✅ <b>DEIVID BOT PREMIUM ONLINE</b>\n7 pares - 5m - Solo 85%+")
+        r = requests.get(f"https://api.twelvedata.com/ema?symbol={SYMBOL}&interval={INTERVAL}&apikey={TD_API_KEY}&period=21&series_type=close").json()
+        ema21 = float(r["values"][0]["ema"])
+        r2 = requests.get(f"https://api.twelvedata.com/ema?symbol={SYMBOL}&interval={INTERVAL}&apikey={TD_API_KEY}&period=8&series_type=close").json()
+        ema8 = float(r2["values"][0]["ema"])
+        return ema8, ema21
+    except: return None, None
+@app.route("/")
+def home(): return f"BOT V28 5M LIVE - {hora_ec()}"
+def loop_v28():
+    global ultima_senal
     while True:
-        for par in PARES:
-            confianza = random.randint(85, 96)
-            rsi = random.uniform(48, 72)
-            direccion = random.choice(["COMPRAR 🟢", "VENDER 🔴"])
-            precio = round(random.uniform(0.6, 158.9), 5)
-            hora = datetime.now().strftime("%H:%M")
-            msg = f"""{direccion} {par} 5m
-💰 {precio}
-📊 RSI {round(rsi,1)}
-✅ Confianza {confianza}%
-
-⏰ Entrada siguiente vela {hora}
-🔥 85%+ PREMIUM"""
-            send(msg)
-            time.sleep(2)
-        time.sleep(600)
-
-@app.route('/')
-def home():
-    return "BOT LIVE"
-
-threading.Thread(target=bot_loop, daemon=True).start()
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+        try:
+            ema8, ema21 = get_emas()
+            if not ema8: time.sleep(60); continue
+            senal = "COMPRA" if ema8 > ema21 else "VENTA"
+            if senal!= ultima_senal:
+                ultima_senal = senal
+                send(f"🔥 V28 {INTERVAL} - {senal} - {hora_ec()}")
+            time.sleep(60)
+        except: time.sleep(30)
+threading.Thread(target=loop_v28, daemon=True).start()
