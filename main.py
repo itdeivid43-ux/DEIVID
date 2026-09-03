@@ -4,7 +4,7 @@ import time
 import requests
 from flask import Flask
 
-BOT_TOKEN = "PEGA_AQUI_TU_TOKEN_NUEVO"  # <--- TU TOKEN NUEVO
+BOT_TOKEN = "8962914647:AAG5pHw1oF-HHIDKNRYD_U4dWxYFbC-WYVk"  # <--- TU TOKEN NUEVO
 CHAT_ID = "5890249548"
 
 app = Flask(__name__)
