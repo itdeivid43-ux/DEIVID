@@ -1,39 +1,33 @@
-import time
-import threading
-import requests
+import time, threading, requests
 from flask import Flask
 
-# --- CONFIGURACION REAL DE DEIVID ---
-BOT_TOKEN = "8962914647:AAHFuFSg14UM4zkdJgVdgi15n4ltr6-5E80"
+BOT_TOKEN = "8962914647:AAG5pHw1oF-HHIDKNRYD_U4dWxYFbC-WYVk"
 CHAT_ID = "5890249548"
 
-def send_telegram(msg):
+def send(msg):
     try:
-        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-        data = {"chat_id": CHAT_ID, "text": msg, "parse_mode": "HTML"}
-        requests.post(url, data=data, timeout=10)
-        print(f"Mensaje enviado: {msg}")
+        r = requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", data={"chat_id": CHAT_ID, "text": msg}, timeout=15)
+        print(f"Telegram: {r.text}")
     except Exception as e:
-        print(f"Error telegram: {e}")
+        print(e)
 
 def bot_loop():
-    send_telegram("✅ <b>DEIVID BOT REAL ONLINE</b>\n\nEl bot ya está funcionando con tu ID real 5890249548\nTe enviaré las señales de ORO XAUUSD aquí.")
+    send("✅ DEIVID BOT CONECTADO - Ya funciona!")
+    offset = 0
     while True:
         try:
-            # Aquí va tu lógica de trading
-            time.sleep(60)
-        except Exception as e:
-            print(e)
+            resp = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates?offset={offset}&timeout=10", timeout=15).json()
+            for upd in resp.get("result", []):
+                offset = upd["update_id"]+1
+                txt = upd.get("message",{}).get("text","").lower()
+                if "start" in txt or "hola" in txt:
+                    send("🚀 Hola Deivid! Bot activo.")
+            time.sleep(2)
+        except:
             time.sleep(5)
 
-# Iniciar bot en segundo plano
 threading.Thread(target=bot_loop, daemon=True).start()
-
-# Servidor web para que Render no se apague
 app = Flask(__name__)
 @app.route('/')
-def home():
-    return "DEIVID BOT LIVE - OK"
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+def home(): return "LIVE"
+app.run(host="0.0.0.0", port=10000)
