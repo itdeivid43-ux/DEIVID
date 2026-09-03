@@ -2,7 +2,7 @@ import os, time, threading, requests
 import yfinance as yf
 import pandas as pd
 from flask import Flask
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 BOT_TOKEN = "8962914647:AAG5pHw1oF-HHIDKNRYD_U4dWxYFbC-WYVk"
 CHAT_ID = "5890249548"
@@ -18,14 +18,13 @@ PARES = {
 }
 
 app = Flask(__name__)
+ECUADOR_TZ = timezone(timedelta(hours=-5))
 
 def send(msg):
     try:
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
         requests.post(url, data={"chat_id": CHAT_ID, "text": msg, "parse_mode": "Markdown"}, timeout=15)
-        print(f"Enviado: {msg[:50]}")
-    except Exception as e:
-        print(f"Error: {e}")
+    except: pass
 
 def get_signal(par):
     try:
@@ -40,32 +39,28 @@ def get_signal(par):
         rsi = 100 - (100 / (1 + rs))
         rsi_last = float(rsi.iloc[-1])
         price = float(close.iloc[-1])
+        hora_ec = datetime.now(ECUADOR_TZ)
+        entrada = (hora_ec + timedelta(minutes=1)).strftime('%H:%M:%S')
         if rsi_last < 32:
-            return f"🟢 *{par}* | RSI: {rsi_last:.1f} | *COMPRA / CALL* 📈\nPrecio: {price:.5f}\nConfianza: 85%\n⏰ Entrada: {(datetime.now()+timedelta(minutes=1)).strftime('%H:%M:%S')} - Expira 10m"
+            return f"🟢 *{par}* | RSI: {rsi_last:.1f} | *COMPRA / CALL* 📈\nPrecio: {price:.5f}\nConfianza: 85%\n⏰ Hora Ecuador: {entrada} - Expira 10m"
         elif rsi_last > 68:
-            return f"🔴 *{par}* | RSI: {rsi_last:.1f} | *VENTA / PUT* 📉\nPrecio: {price:.5f}\nConfianza: 85%\n⏰ Entrada: {(datetime.now()+timedelta(minutes=1)).strftime('%H:%M:%S')} - Expira 10m"
+            return f"🔴 *{par}* | RSI: {rsi_last:.1f} | *VENTA / PUT* 📉\nPrecio: {price:.5f}\nConfianza: 85%\n⏰ Hora Ecuador: {entrada} - Expira 10m"
         return None
-    except Exception as e:
-        print(f"Error {par}: {e}")
-        return None
+    except: return None
 
 def loop():
-    print("Bot 7 pares 10min iniciado")
     time.sleep(3)
-    send("✅ *DEIVID BOT 7 PARES CONECTADO* \nEstoy LIVE 24/7\n⏰ Señales cada 10 minutos")
+    send("✅ *DEIVID BOT 7 PARES CONECTADO - HORA ECUADOR* \nLIVE 24/7 cada 10 min")
     while True:
         for nombre in PARES:
             sig = get_signal(nombre)
             if sig:
                 send(sig)
                 time.sleep(2)
-        print("Ciclo terminado, esperando 10 min...")
         time.sleep(600)
 
 threading.Thread(target=loop, daemon=True).start()
-
 @app.route('/')
-def home(): return "DEIVID 7 PARES 10MIN LIVE"
-
+def home(): return "LIVE ECUADOR"
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
