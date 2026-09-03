@@ -4,8 +4,8 @@ import pandas as pd
 from flask import Flask
 from datetime import datetime, timedelta, timezone
 
-BOT_TOKEN = "8962914647:AAG5pHw1oF-HHIDKNRYD_U4dWxYFbC-WYVk"
-CHAT_ID = "5890249548"
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
 
 PARES = {
     "EUR/USD": "EURUSD=X",
